@@ -10,7 +10,7 @@ import websockets
 
 from datetime import datetime
 
-startTime = datetime.now()
+startTime = None
 
 all_mic_data = []
 all_transcripts = []
@@ -77,7 +77,7 @@ async def run(key, method, format, **kwargs):
 
     elif method == "wav":
         data = kwargs["data"]
-        deepgram_url += f'&channels={kwargs["channels"]}&sample_rate={kwargs["sample_rate"]}&encoding=linear16'
+        deepgram_url += f'&channels={kwargs["channels"]}&sample_rate={kwargs["sample_rate"]}&encoding=linear16&interim_results=true&endpointing=300'
 
     # Connect to the real-time streaming endpoint, attaching our credentials.
     async with websockets.connect(
@@ -152,6 +152,8 @@ async def run(key, method, format, **kwargs):
             return
 
         async def receiver(ws):
+            global startTime
+            global all_transcripts
             """Print out the messages received from the server."""
             first_message = True
             first_transcript = True
@@ -165,6 +167,10 @@ async def run(key, method, format, **kwargs):
                     )
                     first_message = False
                 try:
+                    if startTime is None:
+                        startTime = datetime.now()
+                    now = datetime.now()
+                    duration = now - startTime
                     # handle local server messages
                     if res.get("msg"):
                         print(res["msg"])
@@ -188,8 +194,16 @@ async def run(key, method, format, **kwargs):
                                 first_transcript = False
                             if format == "vtt" or format == "srt":
                                 transcript = subtitle_formatter(res, format)
-                            print(transcript)
+
                             all_transcripts.append(transcript)
+
+                            if res.get("speech_final"):
+                                print(f"[SpeechFinal] Time: {duration} Transcript: {transcript}")# Words: {words}")
+                                print(f"\n[End of Speech] {' '.join(all_transcripts)}\n")
+                                all_transcripts = []
+                            else:
+                                print(f"  [IsFinal] Time: {duration} Transcript: {transcript}")# Words: {words}")
+                            
 
                         # if using the microphone, close stream if user says "goodbye"
                         if method == "mic" and "goodbye" in transcript.lower():
@@ -197,7 +211,28 @@ async def run(key, method, format, **kwargs):
                             print(
                                 "🟢 (5/5) Successfully closed Deepgram connection, waiting for final transcripts if necessary"
                             )
+                    else:
+                        if res.get('type') == 'Results':
+                            transcript = (
+                                res.get("channel", {})
+                                .get("alternatives", [{}])[0]
+                                .get("transcript", "")
+                            )
 
+                            if first_transcript:
+                                print("🟢 (4/5) Began receiving transcription")
+                                # if using webvtt, print out header
+                                if format == "vtt":
+                                    print("WEBVTT\n")
+                                first_transcript = False
+                            print(f"    [Interim] Time: {duration} Transcript: {transcript} ")
+                        if res.get('type') == 'UtteranceEnd':
+                            if len(all_transcripts) > 0:
+                                print(f"> Accepted [Utterance End] Time {duration}")
+                                print(f"\n[End of Speech] {' '.join(all_transcripts)}\n")
+                                all_transcripts = []
+                            else:
+                                print(f"> Ignored [Utterance End] Time {duration}")
                     # handle end of stream
                     if res.get("created"):
                         # save subtitle data if specified
