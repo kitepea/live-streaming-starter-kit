@@ -43,7 +43,8 @@ def subtitle_formatter(response, format):
 
     start = response["start"]
     end = start + response["duration"]
-    transcript = response.get("channel", {}).get("alternatives", [{}])[0].get("transcript", "")
+    transcript = response.get("channel", {}).get(
+        "alternatives", [{}])[0].get("transcript", "")
 
     separator = "," if format == "srt" else '.'
     prefix = "- " if format == "vtt" else ""
@@ -77,7 +78,8 @@ async def run(key, method, format, **kwargs):
 
     elif method == "wav":
         data = kwargs["data"]
-        deepgram_url += f'&channels={kwargs["channels"]}&sample_rate={kwargs["sample_rate"]}&encoding=linear16'
+        deepgram_url += f'&channels={kwargs["channels"]
+                                     }&sample_rate={kwargs["sample_rate"]}&encoding=linear16'
 
     # Connect to the real-time streaming endpoint, attaching our credentials.
     async with websockets.connect(
@@ -92,7 +94,8 @@ async def run(key, method, format, **kwargs):
 
         async def sender(ws):
             print(
-                f'🟢 (2/5) Ready to stream {method if (method == "mic" or method == "url") else kwargs["filepath"]} audio to Deepgram{". Speak into your microphone to transcribe." if method == "mic" else ""}'
+                f'🟢 (2/5) Ready to stream {method if (method == "mic" or method == "url") else kwargs["filepath"]} audio to Deepgram{
+                    ". Speak into your microphone to transcribe." if method == "mic" else ""}'
             )
 
             if method == "mic":
@@ -127,7 +130,8 @@ async def run(key, method, format, **kwargs):
                 nonlocal data
                 # How many bytes are contained in one second of audio?
                 byte_rate = (
-                    kwargs["sample_width"] * kwargs["sample_rate"] * kwargs["channels"]
+                    kwargs["sample_width"] *
+                    kwargs["sample_rate"] * kwargs["channels"]
                 )
                 # How many bytes are in `REALTIME_RESOLUTION` seconds of audio?
                 chunk_size = int(byte_rate * REALTIME_RESOLUTION)
@@ -175,10 +179,12 @@ async def run(key, method, format, **kwargs):
                             .get("transcript", "")
                         )
                         if kwargs["timestamps"]:
-                            words = res.get("channel", {}).get("alternatives", [{}])[0].get("words", [])
+                            words = res.get("channel", {}).get(
+                                "alternatives", [{}])[0].get("words", [])
                             start = words[0]["start"] if words else None
                             end = words[-1]["end"] if words else None
-                            transcript += " [{} - {}]".format(start, end) if (start and end) else ""
+                            transcript += " [{} - {}]".format(
+                                start, end) if (start and end) else ""
                         if transcript != "":
                             if first_transcript:
                                 print("🟢 (4/5) Began receiving transcription")
@@ -211,12 +217,14 @@ async def run(key, method, format, **kwargs):
                             transcript_file_path = os.path.abspath(
                                 os.path.join(
                                     data_dir,
-                                    f"{startTime.strftime('%Y%m%d%H%M')}.{format}",
+                                    f"{startTime.strftime('%Y%m%d%H%M')}.{
+                                        format}",
                                 )
                             )
                             with open(transcript_file_path, "w") as f:
                                 f.write("".join(all_transcripts))
-                            print(f"🟢 Subtitles saved to {transcript_file_path}")
+                            print(f"🟢 Subtitles saved to {
+                                  transcript_file_path}")
 
                             # also save mic data if we were live streaming audio
                             # otherwise the wav file will already be saved to disk
@@ -224,7 +232,8 @@ async def run(key, method, format, **kwargs):
                                 wave_file_path = os.path.abspath(
                                     os.path.join(
                                         data_dir,
-                                        f"{startTime.strftime('%Y%m%d%H%M')}.wav",
+                                        f"{startTime.strftime(
+                                            '%Y%m%d%H%M')}.wav",
                                     )
                                 )
                                 wave_file = wave.open(wave_file_path, "wb")
@@ -236,7 +245,8 @@ async def run(key, method, format, **kwargs):
                                 print(f"🟢 Mic audio saved to {wave_file_path}")
 
                         print(
-                            f'🟢 Request finished with a duration of {res["duration"]} seconds. Exiting!'
+                            f'🟢 Request finished with a duration of {
+                                res["duration"]} seconds. Exiting!'
                         )
                 except KeyError:
                     print(f"🔴 ERROR: Received unexpected API response! {msg}")
@@ -303,6 +313,7 @@ def validate_format(format):
         f'{format} is invalid. Please enter "text", "vtt", or "srt".'
     )
 
+
 def validate_dg_host(dg_host):
     if (
         # Check that the host is a websocket URL
@@ -312,11 +323,12 @@ def validate_dg_host(dg_host):
         # Trim trailing slash if necessary
         if dg_host[-1] == '/':
             return dg_host[:-1]
-        return dg_host 
+        return dg_host
 
     raise argparse.ArgumentTypeError(
-            f'{dg_host} is invalid. Please provide a WebSocket URL in the format "{{wss|ws}}://hostname[:port]".'
+        f'{dg_host} is invalid. Please provide a WebSocket URL in the format "{{wss|ws}}://hostname[:port]".'
     )
+
 
 def parse_args():
     """Parses the command-line arguments."""
@@ -368,7 +380,7 @@ def parse_args():
         default="text",
         type=validate_format,
     )
-    #Parse the host
+    # Parse the host
     parser.add_argument(
         "--host",
         help='Point the test suite at a specific Deepgram URL (useful for on-prem deployments). Takes "{{wss|ws}}://hostname[:port]" as its value. Defaults to "wss://api.deepgram.com".',
@@ -390,7 +402,8 @@ def main():
 
     try:
         if input.lower().startswith("mic"):
-            asyncio.run(run(args.key, "mic", format, model=args.model, tier=args.tier, host=host, timestamps=args.timestamps))
+            asyncio.run(run(args.key, "mic", format, model=args.model,
+                        tier=args.tier, host=host, timestamps=args.timestamps))
 
         elif input.lower().endswith("wav"):
             if os.path.exists(input):
@@ -428,7 +441,8 @@ def main():
                 )
 
         elif input.lower().startswith("http"):
-            asyncio.run(run(args.key, "url", format, model=args.model, tier=args.tier, url=input, host=host, timestamps=args.timestamps))
+            asyncio.run(run(args.key, "url", format, model=args.model,
+                        tier=args.tier, url=input, host=host, timestamps=args.timestamps))
 
         else:
             raise argparse.ArgumentTypeError(
@@ -436,15 +450,18 @@ def main():
             )
 
     except websockets.exceptions.InvalidStatusCode as e:
-        print(f'🔴 ERROR: Could not connect to Deepgram! {e.headers.get("dg-error")}')
+        print(f'🔴 ERROR: Could not connect to Deepgram! {
+              e.headers.get("dg-error")}')
         print(
-            f'🔴 Please contact Deepgram Support (developers@deepgram.com) with request ID {e.headers.get("dg-request-id")}'
+            f'🔴 Please contact Deepgram Support (developers@deepgram.com) with request ID {
+                e.headers.get("dg-request-id")}'
         )
         return
     except websockets.exceptions.ConnectionClosedError as e:
         error_description = f"Unknown websocket error."
         print(
-            f"🔴 ERROR: Deepgram connection unexpectedly closed with code {e.code} and payload {e.reason}"
+            f"🔴 ERROR: Deepgram connection unexpectedly closed with code {
+                e.code} and payload {e.reason}"
         )
 
         if e.reason == "DATA-0000":
