@@ -341,7 +341,7 @@ def parse_args():
         help='Which model to make your request against. Defaults to none specified. See https://developers.deepgram.com/docs/models-overview for all model options.',
         nargs="?",
         const="",
-        default="general",
+        default="nova-2&language=vi",
     )
     parser.add_argument(
         "-t",
