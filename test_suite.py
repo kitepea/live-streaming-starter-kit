@@ -65,7 +65,7 @@ def mic_callback(input_data, frame_count, time_info, status_flag):
 
 
 async def run(key, method, format, **kwargs):
-    deepgram_url = f'{kwargs["host"]}/v1/listen?punctuate=true'
+    deepgram_url = f'{kwargs["host"]}/v1/listen?punctuate=true&diarize=true'
 
     if kwargs["model"]:
         deepgram_url += f"&model={kwargs['model']}"
@@ -155,101 +155,202 @@ async def run(key, method, format, **kwargs):
 
             return
 
-        async def receiver(ws):
+        # async def receiver(ws):
+        #     """Print out the messages received from the server."""
+        #     first_message = True
+        #     first_transcript = True
+        #     transcript = ""
+
+        #     async for msg in ws:
+        #         res = json.loads(msg)
+        #         if first_message:
+        #             print(
+        #                 "🟢 (3/5) Successfully receiving Deepgram messages, waiting for finalized transcription..."
+        #             )
+        #             first_message = False
+        #         try:
+        #             # handle local server messages
+        #             if res.get("msg"):
+        #                 print(res["msg"])
+        #             if res.get("is_final"):
+        #                 transcript = (
+        #                     res.get("channel", {})
+        #                     .get("alternatives", [{}])[0]
+        #                     .get("transcript", "")
+        #                 )
+        #                 if kwargs["timestamps"]:
+        #                     words = res.get("channel", {}).get(
+        #                         "alternatives", [{}])[0].get("words", [])
+        #                     start = words[0]["start"] if words else None
+        #                     end = words[-1]["end"] if words else None
+        #                     transcript += " [{} - {}]".format(
+        #                         start, end) if (start and end) else ""
+        #                 if transcript != "":
+        #                     if first_transcript:
+        #                         print("🟢 (4/5) Began receiving transcription")
+        #                         # if using webvtt, print out header
+        #                         if format == "vtt":
+        #                             print("WEBVTT\n")
+        #                         first_transcript = False
+        #                     if format == "vtt" or format == "srt":
+        #                         transcript = subtitle_formatter(res, format)
+        #                     print(transcript)
+        #                     all_transcripts.append(transcript)
+
+        #                 # if using the microphone, close stream if user says "goodbye"
+        #                 if method == "mic" and "tạm biệt" in transcript.lower():
+        #                     await ws.send(json.dumps({"type": "CloseStream"}))
+        #                     print(
+        #                         "🟢 (5/5) Successfully closed Deepgram connection, waiting for final transcripts if necessary"
+        #                     )
+
+        #             # handle end of stream
+        #             if res.get("created"):
+        #                 # save subtitle data if specified
+        #                 if format == "vtt" or format == "srt":
+        #                     data_dir = os.path.abspath(
+        #                         os.path.join(os.path.curdir, "data")
+        #                     )
+        #                     if not os.path.exists(data_dir):
+        #                         os.makedirs(data_dir)
+
+        #                     transcript_file_path = os.path.abspath(
+        #                         os.path.join(
+        #                             data_dir,
+        #                             f"{startTime.strftime('%Y%m%d%H%M')}.{
+        #                                 format}",
+        #                         )
+        #                     )
+        #                     with open(transcript_file_path, "w") as f:
+        #                         f.write("".join(all_transcripts))
+        #                     print(f"🟢 Subtitles saved to {
+        #                           transcript_file_path}")
+
+        #                     # also save mic data if we were live streaming audio
+        #                     # otherwise the wav file will already be saved to disk
+        #                     if method == "mic":
+        #                         wave_file_path = os.path.abspath(
+        #                             os.path.join(
+        #                                 data_dir,
+        #                                 f"{startTime.strftime(
+        #                                     '%Y%m%d%H%M')}.wav",
+        #                             )
+        #                         )
+        #                         wave_file = wave.open(wave_file_path, "wb")
+        #                         wave_file.setnchannels(CHANNELS)
+        #                         wave_file.setsampwidth(SAMPLE_SIZE)
+        #                         wave_file.setframerate(RATE)
+        #                         wave_file.writeframes(b"".join(all_mic_data))
+        #                         wave_file.close()
+        #                         print(f"🟢 Mic audio saved to {wave_file_path}")
+
+        #                 print(
+        #                     f'🟢 Request finished with a duration of {
+        #                         res["duration"]} seconds. Exiting!'
+        #                 )
+        #         except KeyError:
+        #             print(f"🔴 ERROR: Received unexpected API response! {msg}")
+
+        async def receiver(ws, file_path="transcripts.txt"):
             """Print out the messages received from the server."""
             first_message = True
             first_transcript = True
             transcript = ""
+            all_transcripts = []
 
-            async for msg in ws:
-                res = json.loads(msg)
-                if first_message:
-                    print(
-                        "🟢 (3/5) Successfully receiving Deepgram messages, waiting for finalized transcription..."
-                    )
-                    first_message = False
-                try:
-                    # handle local server messages
-                    if res.get("msg"):
-                        print(res["msg"])
-                    if res.get("is_final"):
-                        transcript = (
-                            res.get("channel", {})
-                            .get("alternatives", [{}])[0]
-                            .get("transcript", "")
+            # Open the file in append mode
+            with open(file_path, "a", encoding="utf-8") as file:
+                async for msg in ws:
+                    res = json.loads(msg)
+                    if first_message:
+                        print(
+                            "🟢 (3/5) Successfully receiving Deepgram messages, waiting for finalized transcription..."
                         )
-                        if kwargs["timestamps"]:
-                            words = res.get("channel", {}).get(
-                                "alternatives", [{}])[0].get("words", [])
-                            start = words[0]["start"] if words else None
-                            end = words[-1]["end"] if words else None
-                            transcript += " [{} - {}]".format(
-                                start, end) if (start and end) else ""
-                        if transcript != "":
-                            if first_transcript:
-                                print("🟢 (4/5) Began receiving transcription")
-                                # if using webvtt, print out header
-                                if format == "vtt":
-                                    print("WEBVTT\n")
-                                first_transcript = False
-                            if format == "vtt" or format == "srt":
-                                transcript = subtitle_formatter(res, format)
-                            print(transcript)
-                            all_transcripts.append(transcript)
-
-                        # if using the microphone, close stream if user says "goodbye"
-                        if method == "mic" and "goodbye" in transcript.lower():
-                            await ws.send(json.dumps({"type": "CloseStream"}))
-                            print(
-                                "🟢 (5/5) Successfully closed Deepgram connection, waiting for final transcripts if necessary"
+                        first_message = False
+                    try:
+                        # handle local server messages
+                        if res.get("msg"):
+                            print(res["msg"])
+                            file.write(res["msg"] + "\n")
+                            file.flush()
+                        if res.get("is_final"):
+                            transcript = (
+                                res.get("channel", {})
+                                .get("alternatives", [{}])[0]
+                                .get("transcript", "")
                             )
+                            if kwargs["timestamps"]:
+                                words = res.get("channel", {}).get(
+                                    "alternatives", [{}])[0].get("words", [])
+                                start = words[0]["start"] if words else None
+                                end = words[-1]["end"] if words else None
+                                transcript += " [{} - {}]".format(
+                                    start, end) if (start and end) else ""
+                            if transcript != "":
+                                if first_transcript:
+                                    print("🟢 (4/5) Began receiving transcription")
+                                    # if using webvtt, print out header
+                                    if format == "vtt":
+                                        print("WEBVTT\n")
+                                    first_transcript = False
+                                if format == "vtt" or format == "srt":
+                                    transcript = subtitle_formatter(res, format)
+                                print(transcript)
+                                file.write(transcript + "\n")
+                                file.flush()
+                                all_transcripts.append(transcript)
 
-                    # handle end of stream
-                    if res.get("created"):
-                        # save subtitle data if specified
-                        if format == "vtt" or format == "srt":
-                            data_dir = os.path.abspath(
-                                os.path.join(os.path.curdir, "data")
-                            )
-                            if not os.path.exists(data_dir):
-                                os.makedirs(data_dir)
-
-                            transcript_file_path = os.path.abspath(
-                                os.path.join(
-                                    data_dir,
-                                    f"{startTime.strftime('%Y%m%d%H%M')}.{
-                                        format}",
+                            # if using the microphone, close stream if user says "goodbye"
+                            if method == "mic" and "tạm biệt" in transcript.lower():
+                                await ws.send(json.dumps({"type": "CloseStream"}))
+                                print(
+                                    "🟢 (5/5) Successfully closed Deepgram connection, waiting for final transcripts if necessary"
                                 )
-                            )
-                            with open(transcript_file_path, "w") as f:
-                                f.write("".join(all_transcripts))
-                            print(f"🟢 Subtitles saved to {
-                                  transcript_file_path}")
 
-                            # also save mic data if we were live streaming audio
-                            # otherwise the wav file will already be saved to disk
-                            if method == "mic":
-                                wave_file_path = os.path.abspath(
+                        # handle end of stream
+                        if res.get("created"):
+                            # save subtitle data if specified
+                            if format == "vtt" or format == "srt":
+                                data_dir = os.path.abspath(
+                                    os.path.join(os.path.curdir, "data")
+                                )
+                                if not os.path.exists(data_dir):
+                                    os.makedirs(data_dir)
+
+                                transcript_file_path = os.path.abspath(
                                     os.path.join(
                                         data_dir,
-                                        f"{startTime.strftime(
-                                            '%Y%m%d%H%M')}.wav",
+                                        f"{startTime.strftime('%Y%m%d%H%M')}.{format}",
                                     )
                                 )
-                                wave_file = wave.open(wave_file_path, "wb")
-                                wave_file.setnchannels(CHANNELS)
-                                wave_file.setsampwidth(SAMPLE_SIZE)
-                                wave_file.setframerate(RATE)
-                                wave_file.writeframes(b"".join(all_mic_data))
-                                wave_file.close()
-                                print(f"🟢 Mic audio saved to {wave_file_path}")
+                                with open(transcript_file_path, "w") as f:
+                                    f.write("".join(all_transcripts))
+                                print(f"🟢 Subtitles saved to {transcript_file_path}")
 
-                        print(
-                            f'🟢 Request finished with a duration of {
-                                res["duration"]} seconds. Exiting!'
-                        )
-                except KeyError:
-                    print(f"🔴 ERROR: Received unexpected API response! {msg}")
+                                # also save mic data if we were live streaming audio
+                                # otherwise the wav file will already be saved to disk
+                                if method == "mic":
+                                    wave_file_path = os.path.abspath(
+                                        os.path.join(
+                                            data_dir,
+                                            f"{startTime.strftime('%Y%m%d%H%M')}.wav",
+                                        )
+                                    )
+                                    wave_file = wave.open(wave_file_path, "wb")
+                                    wave_file.setnchannels(CHANNELS)
+                                    wave_file.setsampwidth(SAMPLE_SIZE)
+                                    wave_file.setframerate(RATE)
+                                    wave_file.writeframes(b"".join(all_mic_data))
+                                    wave_file.close()
+                                    print(f"🟢 Mic audio saved to {wave_file_path}")
+
+                            print(
+                                f'🟢 Request finished with a duration of {res["duration"]} seconds. Exiting!'
+                            )
+                    except KeyError:
+                        print(f"🔴 ERROR: Received unexpected API response! {msg}")
+                        file.write(f"🔴 ERROR: Received unexpected API response! {msg}\n")
+                        file.flush()
 
         # Set up microphone if streaming from mic
         async def microphone():
